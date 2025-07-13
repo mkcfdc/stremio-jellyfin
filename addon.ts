@@ -2,7 +2,6 @@ import {
   addonBuilder,
   type Args,
   type ContentType,
-  type Stream,
 } from "stremio-addon-sdk";
 import { JellyfinApi, server, type JellyfinItem, cleanupSession } from "./jellyfin.ts";
 import { manifest } from "./manifest.ts";
@@ -68,7 +67,7 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
 
   // Helper to build the fallback request‐link URL
   function buildRequestLink(tmdbId: number, season?: string, episode?: string) {
-    const url = new URL(`${Deno.env.get("ADDON_SERVER")}:${Deno.env.get("PORT")}/jellyseerr/request`);
+    const url = new URL(`${Deno.env.get("ADDON_SERVER")}/jellyseerr/request`);
     url.searchParams.set("tmdbid",  tmdbId.toString());
     url.searchParams.set("type",    type);
     if (season)  url.searchParams.set("season",  season);
