@@ -7,7 +7,7 @@ COPY . .
 
 # Environment variables
 ENV JELLYFIN_USER="changeme"
-ENV JELLYFIN_PASSWORD="changeme"
+ENV JELLYFIN_PW="changeme"
 ENV JELLYFIN_SERVER="http://localhost"
 ENV PORT=60421
 
