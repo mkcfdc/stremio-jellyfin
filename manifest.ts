@@ -6,8 +6,8 @@ export const manifest: Manifest = {
     "catalogs": [
         {
             "type": "movie",
-            "id": "jellyfin-movies", // Make sure this is unique and descriptive
-            "name": "Jellyfin Movies", // This name will show in Stremio UI
+            "id": "jellyfin-movies", 
+            "name": "Jellyfin Movies",
             "extra": [
                 { "name": "skip", "isRequired": true },
                 { "name": "search", "isRequired": false }
@@ -15,8 +15,8 @@ export const manifest: Manifest = {
         },
         {
             "type": "series",
-            "id": "jellyfin-series", // Make sure this is unique and descriptive
-            "name": "Jellyfin Series", // This name will show in Stremio UI
+            "id": "jellyfin-series",
+            "name": "Jellyfin Series",
             "extra": [
                 { "name": "skip", "isRequired": true },
                 { "name": "search", "isRequired": false }
@@ -26,7 +26,6 @@ export const manifest: Manifest = {
     "resources": [
         "catalog",
         "stream",
-       // "meta"
     ],
     "types": [
         "movie",

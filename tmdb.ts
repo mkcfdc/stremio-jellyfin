@@ -1,4 +1,4 @@
-import { logDebug, logError, logInfo, logWarn } from "./utils/logging.ts";
+import { logError, logInfo, logWarn } from "./utils/logging.ts";
 
 const TMDB_API_BASE_URL = ' https://api.themoviedb.org/3';
 const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
