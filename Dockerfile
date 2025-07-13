@@ -1,5 +1,5 @@
 # Use the official Deno runtime image
-FROM denoland/deno:bin-2.4.1
+FROM denoland/deno:alpine-2.4.1
 
 # Set up workdir and copy in your code
 WORKDIR /home/deno/app
