@@ -141,7 +141,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   const path = new URL(req.url).pathname;
   
-  if (Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY")) {
+  if (Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY") && Deno.env.get("ADDON_SERVER")) {
     if (path === "/jellyseerr/request" && req.method === "GET") {
       return handleJellyseerrRequest(req);
     }

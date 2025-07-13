@@ -68,7 +68,7 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
 
   // Helper to build the fallback request‐link URL
   function buildRequestLink(tmdbId: number, season?: string, episode?: string) {
-    const url = new URL(`http://localhost:${Deno.env.get("PORT")}/jellyseerr/request`);
+    const url = new URL(`http://${Deno.env.get("ADDON_SERVER")}:${Deno.env.get("PORT")}/jellyseerr/request`);
     url.searchParams.set("tmdbid",  tmdbId.toString());
     url.searchParams.set("type",    type);
     if (season)  url.searchParams.set("season",  season);
@@ -149,7 +149,7 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
     }
 
     // ——— Otherwise, return the “Request on Jellyseerr” link ———
-    if (tmdbId && Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY")) {
+    if (tmdbId && Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY") && Deno.env.get("ADDON_SERVER")) {
       const link = buildRequestLink(tmdbId, seasonStr, episodeStr);
       logInfo(`Content not found—returning request-link: ${link}`);
       return {
