@@ -115,7 +115,7 @@ if (!password) {
 
 export const itemsLimit = 20; // Default limit for catalog requests
 
-export const device = globalThis.Deno?.hostname?.() ?? "deno-client";
+export const device = "deno-client";
 export const deviceId = `deno-${crypto.randomUUID()}`;
 export const clientName = "DenoJellyfinClient";
 export const clientVersion = "1.0.0";
@@ -183,8 +183,8 @@ export class JellyfinApi {
     try {
       const sessions = await this.request<JellyfinSession[]>(
         "/Sessions",
-        {}, // No query parameters needed for getting all sessions
-        "GET", // Explicitly use GET
+        {}, 
+        "GET", 
       );
       logDebug(`JellyfinApi: Retrieved ${sessions.length} sessions.`);
       return sessions;

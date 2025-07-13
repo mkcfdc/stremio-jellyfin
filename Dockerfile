@@ -9,7 +9,7 @@ COPY . .
 ENV JELLYFIN_USER="changeme"
 ENV JELLYFIN_PASSWORD="changeme"
 ENV JELLYFIN_SERVER="http://localhost"
-ENV SERVER_PORT=60421
+ENV PORT=60421
 
 RUN deno cache main.ts
 
@@ -17,7 +17,7 @@ RUN deno cache main.ts
 USER deno
 
 # Expose the port your app listens on
-EXPOSE $SERVER_PORT
+EXPOSE $PORT
 
 # Run your server with the minimal required permissions
 ENTRYPOINT ["deno", "run", "--allow-net", "--allow-env", "main.ts"]
