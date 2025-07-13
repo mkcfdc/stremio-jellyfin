@@ -13,6 +13,10 @@ capability using IMDB identifiers. Both components are required.
 
 This version does not require the companion plugin.
 
+### TMDB_API_KEY now required.
+
+Had to add TMDB api call to get the show/movie name. Since for some reason Jellyfin will never play nice with IMDB? I would add Redis caching for this if you were to run this publicly. But for a localhost job, this will be just fine.
+
 ### Jellyfin Stremio Addon
 
 Jellyfin Stremio addon should be installed in your local docker environment. To install it pull latest docker addon image:
@@ -21,7 +25,7 @@ Jellyfin Stremio addon should be installed in your local docker environment. To 
 
 and then run it:
 
-`docker run -p 60421:60421 -e JELLYFIN_USER="<your jellyfin username>" -e JELLYFIN_PW="<your jellyfin user password>" -e JELLYFIN_SERVER="<your jellyfin server address>" ghcr.io/mkcfdc/stremio-jellyfin"`
+`docker run -p 60421:60421 -e JELLYFIN_USER="<your jellyfin username>" -e JELLYFIN_PW="<your jellyfin user password>" -e JELLYFIN_SERVER="<your jellyfin server address>" -e TMDB_API_KEY="<your tmdb key here>" ghcr.io/mkcfdc/stremio-jellyfin"`
 
 where:
 * `60421` - is standard port addon is running on (You may remap it in docker)

@@ -1,4 +1,5 @@
 import { logDebug, logError, logInfo, logWarn } from "./utils/logging.ts";
+import { getTmdbNameFromImdbId } from "./tmdb.ts";
 
 export interface JellyfinSession {
   Id: string;
@@ -388,62 +389,73 @@ export class JellyfinApi {
    * Fetches the full JellyfinItem details given an IMDB ID.
    * This is the correct way to find an item in your library by its IMDB ID.
    */
-  async getFullItemByImdbId(
-    imdbId: string,
-    type: "series" | "movie",
-  ): Promise<JellyfinItem | null> {
-    if (!this.userId) {
-      logError(
-        "JellyfinApi: userId is not set. Cannot call getFullItemByImdbId.",
+async getFullItemByImdbId(
+  imdbId: string,
+  type: "series" | "movie",
+): Promise<JellyfinItem | null> {
+  if (!this.userId) {
+    logError(
+      "JellyfinApi: userId is not set. Cannot call getFullItemByImdbId.",
+    );
+    return null;
+  }
+
+  logInfo(`JellyfinApi: Attempting to find item by IMDB ID: ${imdbId}`);
+
+  // Step 1: Get the name from TMDB
+  const itemName = await getTmdbNameFromImdbId(imdbId, type);
+
+  if (!itemName) {
+    logWarn(`JellyfinApi: Could not retrieve item name from TMDB for IMDB ID: ${imdbId}. Cannot proceed with Jellyfin search.`);
+    return null;
+  }
+
+  try {
+    const params: Record<string, string | number | boolean | undefined> = {
+      userId: this.userId,
+      Recursive: true,
+      IncludeItemTypes: type === "movie" ? "Movie" : "Series",
+      Limit: 5, // Increased limit to find variations if needed, but searchTerm helps narrow
+      Fields:
+        "ProviderIds,Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,OfficialRating,ImageTags,MediaSources,Chapters,MediaStreams,SeasonCollection,Studios",
+      Filters: "HasExternalId", // Still good to only get items that have *some* external ID
+      searchTerm: itemName, // <<< Pass the name obtained from TMDB here
+      // No "ProviderIds.Imdb" or "ProviderIdEquals" here
+    };
+
+    const result = await this.request<PagedResult<JellyfinItem>>(
+      "/Items",
+      params,
+    );
+
+    if (result.Items && result.Items.length > 0) {
+      const foundItem = result.Items.find(
+        (item) => item.ProviderIds?.Imdb === imdbId,
       );
-      return null;
-    }
 
-    logInfo(`JellyfinApi: Attempting to find item by IMDB ID: ${imdbId}`);
-    try {
-      const params: Record<string, string | number | boolean | undefined> = {
-        userId: this.userId,
-        Recursive: true,
-        IncludeItemTypes: type === "movie" ? "Movie" : "Series",
-        Limit: 1,
-        Fields:
-          "ProviderIds,Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,OfficialRating,ImageTags,MediaSources,Chapters,MediaStreams,SeasonCollection,Studios",
-        Filters: "HasExternalId",
-        "ProviderIds.Imdb": imdbId,
-      };
-
-      const result = await this.request<PagedResult<JellyfinItem>>(
-        "/Items",
-        params,
-      );
-
-      if (result.Items && result.Items.length > 0) {
-        const foundItem = result.Items[0];
-
-        // *** ADDED: Explicit IMDB ID validation ***
-        if (foundItem.ProviderIds?.Imdb === imdbId) {
-          logInfo(
-            `JellyfinApi: Successfully found item "${foundItem.Name}" (ID: ${foundItem.Id}) with matching IMDB ID ${imdbId}.`,
-          );
-          return foundItem;
-        } else {
-          logWarn(
-            `JellyfinApi: Found item "${foundItem.Name}" (ID: ${foundItem.Id}) for requested IMDB ID ${imdbId}, ` +
-              `but its actual IMDB ID is "${foundItem.ProviderIds?.Imdb}". Returning null due to mismatch.`,
-          );
-          return null; // Return null if the actual IMDB ID doesn't match the requested one
-        }
+      if (foundItem) {
+        logInfo(
+          `JellyfinApi: Successfully found item "${foundItem.Name}" (ID: ${foundItem.Id}) with matching IMDB ID ${imdbId} after client-side filtering.`,
+        );
+        return foundItem;
       } else {
         logWarn(
-          `JellyfinApi: No item found in library for IMDB ID: ${imdbId}.`,
+          `JellyfinApi: Jellyfin returned items for "${itemName}", but none had the exact IMDB ID: ${imdbId}. ` +
+            `This might indicate a metadata discrepancy in Jellyfin.`,
         );
         return null;
       }
-    } catch (error) {
-      logError(`JellyfinApi: Error fetching item by IMDB ID ${imdbId}:`, error);
+    } else {
+      logWarn(
+        `JellyfinApi: No items returned from Jellyfin for search term "${itemName}" (IMDB ID: ${imdbId}).`,
+      );
       return null;
     }
+  } catch (error) {
+    logError(`JellyfinApi: Error fetching item by IMDB ID ${imdbId}:`, error);
+    return null;
   }
+}
 
   /**
    * Get seasons for a given series item.
@@ -499,7 +511,7 @@ export class JellyfinApi {
           seasonId,
           userId: this.userId,
           Fields: "ImageTags,Overview,RunTimeTicks",
-        }, // Request image tags and overview
+        }, 
       );
       logInfo(
         `JellyfinApi: Found ${data.Items.length} episodes for series ID ${seriesId}, Season ID ${seasonId}.`,
