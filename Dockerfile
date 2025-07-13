@@ -10,6 +10,7 @@ ENV JELLYFIN_USERNAME="changeme"
 ENV JELLYFIN_PW="changeme"
 ENV JELLYFIN_SERVER="http://localhost"
 ENV PORT=60421
+ENV DENO_ENV="production"
 
 RUN deno cache main.ts
 

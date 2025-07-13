@@ -22,41 +22,38 @@ export interface TmdbSeriesSearchResult {
   // ... other properties you might get
 }
 
-export async function getTmdbNameFromImdbId(
+export interface TmdbInfo {
+  tmdb_id: number;
+  tmdb_title: string;
+}
+
+export async function getTmdbFromImdbId(
   imdbId: string,
-  type: "movie" | "series",
-): Promise<string | null> {
+  type: "movie" | "series"
+): Promise<TmdbInfo | null> {
   try {
-    let url: string;
-    if (type === "movie") {
-      // TMDB's find endpoint is useful for external IDs
-      url = `${TMDB_API_BASE_URL}/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
-    } else {
-      // For TV shows, the 'find' endpoint also works similarly
-      url = `${TMDB_API_BASE_URL}/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
-    }
-
-    const response = await fetch(url); // Or use axios
+    const url = `${TMDB_API_BASE_URL}/find/${imdbId}` +
+                `?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
+    const response = await fetch(url);
     if (!response.ok) {
-      logError(`TMDB API error for ${imdbId}: ${response.statusText}`);
+      console.error(`TMDB API error for ${imdbId}: ${response.statusText}`);
       return null;
     }
-    const data = await response.json();
-
-    // pull the images from TMDB too since Jellyfin is sending the wrong headers.
-
-    if (type === "movie" && data.movie_results && data.movie_results.length > 0) {
-      logInfo(`TMDB: Found movie name "${data.movie_results[0].title}" for IMDB ID ${imdbId}`);
-      return data.movie_results[0].title;
-    } else if (type === "series" && data.tv_results && data.tv_results.length > 0) {
-      logInfo(`TMDB: Found series name "${data.tv_results[0].name}" for IMDB ID ${imdbId}`);
-      return data.tv_results[0].name;
-    } else {
-      logWarn(`TMDB: No results found for IMDB ID ${imdbId} (Type: ${type})`);
-      return null;
+    const data: any = await response.json();
+    if (type === "movie" && Array.isArray(data.movie_results) && data.movie_results.length > 0) {
+      const m = data.movie_results[0];
+      console.info(`TMDB: Found movie ${m.title} (ID ${m.id}) for IMDB ${imdbId}`);
+      return { tmdb_id: m.id.toString(), tmdb_title: m.title };
     }
+    if (type === "series" && Array.isArray(data.tv_results) && data.tv_results.length > 0) {
+      const s = data.tv_results[0];
+      console.info(`TMDB: Found series ${s.name} (ID ${s.id}) for IMDB ${imdbId}`);
+      return { tmdb_id: s.id.toString(), tmdb_title: s.name };
+    }
+    console.warn(`TMDB: No ${type} result for IMDB ${imdbId}`);
+    return null;
   } catch (error) {
-    logError(`TMDB: Error fetching name for IMDB ID ${imdbId}:`, error);
+    console.error(`TMDB: Error fetching IMDB ${imdbId}:`, error);
     return null;
   }
 }

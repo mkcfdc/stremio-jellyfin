@@ -25,13 +25,7 @@ Jellyfin Stremio addon should be installed in your local docker environment. To 
 
 and then run it:
 
-`docker run -p 60421:60421 -e JELLYFIN_USERNAME="<your jellyfin username>" -e JELLYFIN_PW="<your jellyfin user password>" -e JELLYFIN_SERVER="<your jellyfin server address>" -e TMDB_API_KEY="<your tmdb key here>" ghcr.io/mkcfdc/stremio-jellyfin"`
-
-where:
-* `60421` - is standard port addon is running on (You may remap it in docker)
-* `<your jellyfin username>` - Jellyfin username
-* `<your jellyfin user password>` - Jellyfin password
-* `<your jellyfin server address>` - Jellyfin server address and port (`http://aaa.bbb.ccc.ddd:eee`). Make sure Jellyfin is connectable.
+`docker run -p 60421:60421 -e JELLYSEERR_SERVER="<your jellyseerr server including port" -e JELLYSEERR_API_KEY="<your jellyseerr api key here>" -e JELLYFIN_USERNAME="<your jellyfin username>" -e JELLYFIN_PW="<your jellyfin user password>" -e JELLYFIN_SERVER="<your jellyfin server address>" -e TMDB_API_KEY="<your tmdb key here>" ghcr.io/mkcfdc/stremio-jellyfin"`
 
 You can run it in Your docker orchestrator too (like Rancher or Unraid).
 

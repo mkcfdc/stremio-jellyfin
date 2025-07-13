@@ -10,8 +10,9 @@ import { manifest } from "./manifest.ts";
 import { logDebug, logError, logInfo, logWarn } from "./utils/logging.ts";
 import { stringToUuid } from "./utils/stringToUuid.ts";
 import { itemToMeta } from "./utils/itemToMeta.ts";
+import { getTmdbFromImdbId } from "./tmdb.ts";
 
-const jellyfin = new JellyfinApi();
+export const jellyfin = new JellyfinApi();
 try {
     await jellyfin.authenticate();
     logInfo("Jellyfin API client authenticated successfully. Add-on is ready.");
@@ -65,102 +66,109 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
   const { type, id } = args;
   logInfo(`Stream request received: Type=${type}, ID=${id}`);
 
-  let actualJellyfinItem: JellyfinItem | null = null;
-  let requestedImdbId: string | null = null;
+  // Helper to build the fallback request‐link URL
+  function buildRequestLink(tmdbId: number, season?: string, episode?: string) {
+    const url = new URL(`http://localhost:${Deno.env.get("PORT")}/jellyseerr/request`);
+    url.searchParams.set("tmdbid",  tmdbId.toString());
+    url.searchParams.set("type",    type);
+    if (season)  url.searchParams.set("season",  season);
+    if (episode) url.searchParams.set("episode", episode);
+    return url.toString();
+  }
 
   try {
+    let actualItem: JellyfinItem | null = null;
+    let tmdbId: number | undefined;
+    let seasonStr: string | undefined;
+    let episodeStr: string | undefined;
+
     if (id.includes(":")) {
-      // This is an episode request: imdbId:seasonNumber:episodeNumber
-      logInfo(`Handling episode stream request for complex ID: ${id}`);
-      const [imdbSeriesId, seasonStr, episodeStr] = id.split(":");
-      requestedImdbId = imdbSeriesId; 
-      const season = Number(seasonStr);
-      const episode = Number(episodeStr);
+      // ——— Episode flow ———
+      // ID format: "{imdbSeriesId}:{seasonNumber}:{episodeNumber}"
+      const [imdbSeriesId, sStr, eStr] = id.split(":");
+      seasonStr  = sStr;
+      episodeStr = eStr;
 
-      logDebug(`Parsed episode request: IMDB Series ID=${imdbSeriesId}, Season=${season}, Episode=${episode}`);
-
-      const seriesSearchResult = await jellyfin.getFullItemByImdbId(imdbSeriesId, type);
-      if (!seriesSearchResult || !seriesSearchResult.ProviderIds.Imdb) {
-        logWarn(`Series search result not found for IMDB ID: ${imdbSeriesId}. Cannot get episode stream.`);
-        return { streams: [] };
+      // Map to TMDB so we can build a request-link later
+      const tmdb = await getTmdbFromImdbId(imdbSeriesId, type);
+      tmdbId = tmdb?.tmdb_id;
+      if (!tmdbId) {
+        logWarn(`Cannot map IMDB ${imdbSeriesId} → TMDB`);
       }
 
-      logDebug(`Found Jellyfin Series ItemId: ${seriesSearchResult.Id} for IMDB ID: ${imdbSeriesId}`);
-      const seriesItem = await jellyfin.getItemById(seriesSearchResult.Id);
-
-      if (!seriesItem) {
-        logWarn(`Full series item not found for Jellyfin ID: ${seriesSearchResult.Id}. Cannot get episode stream.`);
-        return { streams: [] };
+      // 1) find the series in Jellyfin
+      const seriesPreview = await jellyfin.getFullItemByImdbId(imdbSeriesId, type, tmdb?.tmdb_title);
+      if (seriesPreview?.ProviderIds?.Imdb !== imdbSeriesId) {
+        logWarn(`Series not in Jellyfin: IMDB=${imdbSeriesId}`);
+      } else {
+        // 2) fetch the full series object
+        const seriesItem = await jellyfin.getItemById(seriesPreview.Id);
+        if (seriesItem) {
+          // 3) locate the correct season
+          const seasons = await jellyfin.getSeasonsBySeriesId(seriesItem.Id);
+          const seasonNum = Number(sStr);
+          const seasonItem = seasons.find(s => s.IndexNumber === seasonNum);
+          if (seasonItem) {
+            // 4) locate the episode
+            const eps = await jellyfin.getEpisodesBySeasonId(seriesItem.Id, seasonItem.Id);
+            const episodeNum = Number(eStr);
+            const epItem = eps.find(e => e.IndexNumber === episodeNum);
+            if (epItem) {
+              actualItem = await jellyfin.getItemById(epItem.Id);
+            }
+          }
+        }
       }
-      logDebug(`Retrieved full series item: "${seriesItem.Name}" (ID: ${seriesItem.Id})`);
-
-      const seasons = await jellyfin.getSeasonsBySeriesId(seriesItem.Id);
-      const seasonItem = seasons.find(s => s.IndexNumber === season);
-      if (!seasonItem) {
-        logWarn(`Season ${season} not found for series ID: ${seriesItem.Id}. Available seasons: ${seasons.map(s => s.IndexNumber).join(', ')}`);
-        return { streams: [] };
-      }
-      logDebug(`Found season item: "${seasonItem.Name}" (ID: ${seasonItem.Id}, Index: ${seasonItem.IndexNumber})`);
-
-      const episodes = await jellyfin.getEpisodesBySeasonId(seriesItem.Id, seasonItem.Id);
-      const episodeItem = episodes.find(ep => ep.IndexNumber === episode);
-      if (!episodeItem) {
-        logWarn(`Episode ${episode} not found for season ID: ${seasonItem.Id}. Available episodes: ${episodes.map(ep => ep.IndexNumber).join(', ')}`);
-        return { streams: [] };
-      }
-      logDebug(`Found episode item: "${episodeItem.Name}" (ID: ${episodeItem.Id}, Index: ${episodeItem.IndexNumber})`);
-
-      actualJellyfinItem = await jellyfin.getItemById(episodeItem.Id);
-      logDebug(`Retrieved actual Jellyfin item for episode: "${actualJellyfinItem?.Name}" (ID: ${actualJellyfinItem?.Id})`);
-
     } else {
-      logInfo(`Handling movie stream request for IMDB ID: ${id}`);
-      requestedImdbId = id;
-      actualJellyfinItem = await jellyfin.getFullItemByImdbId(id, type);
-      logDebug(`Retrieved actual Jellyfin item for movie: "${actualJellyfinItem?.Name}" (ID: ${actualJellyfinItem?.Id})`);
+      // ——— Movie flow ———
+      const imdbId = id;
+      const tmdb    = await getTmdbFromImdbId(imdbId, type);
+      tmdbId = tmdb?.tmdb_id;
+      if (!tmdbId) logWarn(`Cannot map IMDB ${imdbId} → TMDB`);
 
-      if (actualJellyfinItem && actualJellyfinItem.ProviderIds?.Imdb !== requestedImdbId) {
-        logWarn(`IMDB ID mismatch for movie. Requested: ${requestedImdbId}, Found: ${actualJellyfinItem.ProviderIds?.Imdb}. Not displaying stream.`);
-        return { streams: [] };
-      }
+      actualItem = await jellyfin.getFullItemByImdbId(imdbId, type, tmdb?.tmdb_title);
     }
 
-    if (!actualJellyfinItem) {
-      logWarn(`No Jellyfin item found for stream request ID: ${id}.`);
-      return { streams: [] };
-    }
+    // ——— If we have a real stream, return it ———
+    if (actualItem?.MediaSources?.length) {
+      const uuid      = stringToUuid(actualItem.Id);
+      const sourceId  = actualItem.MediaSources[0].Id;
+      const token     = jellyfin.getAccessToken();
+      const streamUrl =
+        `${server}/videos/${uuid}/stream.mkv?static=true` +
+        `&api_key=${token}` +
+        `&mediaSourceId=${sourceId}`;
 
-    if (!actualJellyfinItem.MediaSources?.length) {
-      logWarn(`Jellyfin item "${actualJellyfinItem.Name}" (ID: ${actualJellyfinItem.Id}) has no media sources. Cannot stream.`);
-      return { streams: [] };
-    }
-
-    const itemUuid = stringToUuid(actualJellyfinItem.Id);
-    const src = actualJellyfinItem.MediaSources[0]; // Assuming the first media source is the one we want
-
-    if (itemUuid && src.Id) {
-      const accessToken = jellyfin.getAccessToken();
-      const streamUrl = `${server}/videos/${itemUuid}/stream.mkv?static=true`
-        + `&api_key=${accessToken}`
-        + `&mediaSourceId=${src.Id}`;
-
-      const stream: Stream = {
-        url: streamUrl,
-        name: "Jellyfin",
-        description: actualJellyfinItem.Name + " " + src.MediaStreams?.[0]?.DisplayTitle,
+      return {
+        streams: [{
+          url:         streamUrl,
+          name:        actualItem.Name,
+          description: `Play “${actualItem.Name}” on Jellyfin`,
+        }],
       };
-      logInfo(`Generated stream for "${actualJellyfinItem.Name}". URL: ${streamUrl.substring(0, 100)}... (truncated for log)`);
-      return { streams: [stream] };
-    } else {
-      logWarn(`Could not construct stream URL for item ID: ${id}. Missing item UUID or source ID.`);
-      return { streams: [] };
     }
 
-  } catch (error) {
-    logError(`Unhandled error in stream handler for ID ${id}:`, error);
+    // ——— Otherwise, return the “Request on Jellyseerr” link ———
+    if (tmdbId && Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY")) {
+      const link = buildRequestLink(tmdbId, seasonStr, episodeStr);
+      logInfo(`Content not found—returning request-link: ${link}`);
+      return {
+        streams: [{
+          externalUrl:         link,
+          name:        `Request on Jellyseerr`,
+          description: `Click to queue ${id} in Jellyseerr`,
+        }],
+      };
+    } else {
+      return { streams: [] };
+    }
+  }
+  catch (err: any) {
+    logError(`Error in stream handler for ID=${id}:`, err);
     return { streams: [] };
   }
 });
+
 
 logInfo("Exporting Stremio addon interface.");
 export const addonInterface = builder.getInterface();

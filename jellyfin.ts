@@ -1,5 +1,4 @@
 import { logDebug, logError, logInfo, logWarn } from "./utils/logging.ts";
-import { getTmdbNameFromImdbId } from "./tmdb.ts";
 
 export interface JellyfinSession {
   Id: string;
@@ -122,7 +121,7 @@ export const clientName = "DenoJellyfinClient";
 export const clientVersion = "1.0.0";
 
 export class JellyfinApi {
-  private userId: string | null = null;
+  public userId: string | null = null;
   private accessToken: string | null = null; 
   public currentSessionId: string | null = null;
 
@@ -392,7 +391,9 @@ export class JellyfinApi {
 async getFullItemByImdbId(
   imdbId: string,
   type: "series" | "movie",
+  itemName?: string
 ): Promise<JellyfinItem | null> {
+
   if (!this.userId) {
     logError(
       "JellyfinApi: userId is not set. Cannot call getFullItemByImdbId.",
@@ -401,9 +402,6 @@ async getFullItemByImdbId(
   }
 
   logInfo(`JellyfinApi: Attempting to find item by IMDB ID: ${imdbId}`);
-
-  // Step 1: Get the name from TMDB
-  const itemName = await getTmdbNameFromImdbId(imdbId, type);
 
   if (!itemName) {
     logWarn(`JellyfinApi: Could not retrieve item name from TMDB for IMDB ID: ${imdbId}. Cannot proceed with Jellyfin search.`);
