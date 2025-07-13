@@ -1,20 +1,23 @@
-FROM node:21-slim
+# Use the official Deno runtime image
+FROM denoland/deno-bin-2.4.1
 
-ENV JELLYFIN_USER "changeme"
-ENV JELLYFIN_PASSWORD "changeme"
-ENV SERVER_PORT 60421
-ENV JELLYFIN_SERVER "http://localhost"
+# Set up workdir and copy in your code
+WORKDIR /home/deno/app
+COPY . .
 
-RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
-WORKDIR /home/node/app
+# Environment variables
+ENV JELLYFIN_USER="changeme"
+ENV JELLYFIN_PASSWORD="changeme"
+ENV JELLYFIN_SERVER="http://localhost"
+ENV SERVER_PORT=60421
 
-COPY package*.json ./
-COPY *.js ./
+RUN deno cache main.ts
 
-RUN chown -R node:node /home/node/app
+# Switch to non-root user
+USER deno
 
-USER node
-RUN npm install
-
+# Expose the port your app listens on
 EXPOSE $SERVER_PORT
-ENTRYPOINT ["nodejs", "server.js"]
+
+# Run your server with the minimal required permissions
+ENTRYPOINT ["deno", "run", "--allow-net", "--allow-env", "main.ts"]

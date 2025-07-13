@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "dev": "deno run --watch --allow-env --env-file --allow-sys --allow-read --allow-net main.ts"
+  },
+  "imports": {
+    "stremio-addon-sdk": "npm:stremio-addon-sdk@^1.6.10"
+  }
+}
