@@ -1,0 +1,19 @@
+services:
+  stremio-jellyfin:
+    image: ghcr.io/mkcfdc/stremio-jellyfin
+    container_name: stremio-jellyfin
+    ports:
+      - '60421:60421'
+    env_file:
+      - .env                      # pull in all the JELLY* and TMDB_API_KEY vars
+    restart: unless-stopped
+    healthcheck:                  # optional but helps Docker know when the service is ready
+      test: ["CMD", "curl", "-f", "http://localhost:60421/manifest.json"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    logging:                      # optional: limit log size to avoid filling disk
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

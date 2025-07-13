@@ -21,4 +21,4 @@ USER deno
 EXPOSE $PORT
 
 # Run your server with the minimal required permissions
-ENTRYPOINT ["deno", "run", "--allow-net", "--allow-env", "main.ts"]
+ENTRYPOINT ["deno", "run", "--allow-net", "--allow-env", "--allow-sys", "--allow-read" "main.ts"]
