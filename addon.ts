@@ -68,7 +68,7 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
 
   // Helper to build the fallback request‐link URL
   function buildRequestLink(tmdbId: number, season?: string, episode?: string) {
-    const url = new URL(`http://${Deno.env.get("ADDON_SERVER")}:${Deno.env.get("PORT")}/jellyseerr/request`);
+    const url = new URL(`${Deno.env.get("ADDON_SERVER")}:${Deno.env.get("PORT")}/jellyseerr/request`);
     url.searchParams.set("tmdbid",  tmdbId.toString());
     url.searchParams.set("type",    type);
     if (season)  url.searchParams.set("season",  season);
