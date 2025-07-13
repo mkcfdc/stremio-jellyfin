@@ -388,72 +388,73 @@ export class JellyfinApi {
    * Fetches the full JellyfinItem details given an IMDB ID.
    * This is the correct way to find an item in your library by its IMDB ID.
    */
-async getFullItemByImdbId(
-  imdbId: string,
-  type: "series" | "movie",
-  itemName?: string
-): Promise<JellyfinItem | null> {
-
+async getFullItemByExternalId({
+  imdbId,
+  tmdbId,
+  type,
+  itemName,
+}: {
+  imdbId?: string;
+  tmdbId?: number;
+  type: "movie" | "series";
+  itemName?: string;
+}): Promise<JellyfinItem | null> {
   if (!this.userId) {
-    logError(
-      "JellyfinApi: userId is not set. Cannot call getFullItemByImdbId.",
-    );
+    logError("userId not set—cannot search.");
     return null;
   }
-
-  logInfo(`JellyfinApi: Attempting to find item by IMDB ID: ${imdbId}`);
-
   if (!itemName) {
-    logWarn(`JellyfinApi: Could not retrieve item name from TMDB for IMDB ID: ${imdbId}. Cannot proceed with Jellyfin search.`);
+    logWarn(`No itemName; cannot search for IMDB:${imdbId} or TMDB:${tmdbId}`);
     return null;
   }
 
+  // 1) Build a name-based search
+  const params = {
+    userId:    this.userId,
+    Recursive: true,
+    IncludeItemTypes: type === "movie" ? "Movie" : "Series",
+    Limit:     10,
+    Fields:    "ProviderIds,ImageTags,MediaSources,MediaStreams,Chapters,SeasonCollection",
+    Filters:   "HasExternalId",   // only items with any external ID
+    searchTerm: itemName,
+  };
+
+  let result: PagedResult<JellyfinItem>;
   try {
-    const params: Record<string, string | number | boolean | undefined> = {
-      userId: this.userId,
-      Recursive: true,
-      IncludeItemTypes: type === "movie" ? "Movie" : "Series",
-      Limit: 5, // Increased limit to find variations if needed, but searchTerm helps narrow
-      Fields:
-        "ProviderIds,Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,OfficialRating,ImageTags,MediaSources,Chapters,MediaStreams,SeasonCollection,Studios",
-      Filters: "HasExternalId", // Still good to only get items that have *some* external ID
-      searchTerm: itemName, // <<< Pass the name obtained from TMDB here
-      // No "ProviderIds.Imdb" or "ProviderIdEquals" here
-    };
-
-    const result = await this.request<PagedResult<JellyfinItem>>(
-      "/Items",
-      params,
-    );
-
-    if (result.Items && result.Items.length > 0) {
-      const foundItem = result.Items.find(
-        (item) => item.ProviderIds?.Imdb === imdbId,
-      );
-
-      if (foundItem) {
-        logInfo(
-          `JellyfinApi: Successfully found item "${foundItem.Name}" (ID: ${foundItem.Id}) with matching IMDB ID ${imdbId} after client-side filtering.`,
-        );
-        return foundItem;
-      } else {
-        logWarn(
-          `JellyfinApi: Jellyfin returned items for "${itemName}", but none had the exact IMDB ID: ${imdbId}. ` +
-            `This might indicate a metadata discrepancy in Jellyfin.`,
-        );
-        return null;
-      }
-    } else {
-      logWarn(
-        `JellyfinApi: No items returned from Jellyfin for search term "${itemName}" (IMDB ID: ${imdbId}).`,
-      );
-      return null;
-    }
-  } catch (error) {
-    logError(`JellyfinApi: Error fetching item by IMDB ID ${imdbId}:`, error);
+    result = await this.request<PagedResult<JellyfinItem>>("/Items", params);
+  } catch (err) {
+    logError(`Error during /Items search for "${itemName}"`, err);
     return null;
   }
+
+  if (!result.Items?.length) {
+    logWarn(`No results for "${itemName}" (IMDB:${imdbId} / TMDB:${tmdbId}).`);
+    return null;
+  }
+
+  // 2) Client-side filter: try IMDb first, then TMDB
+  const tmdbStr = tmdbId?.toString();
+  const found = result.Items.find(item => {
+    const ids = item.ProviderIds ?? {};
+    return Boolean(
+      (imdbId && ids.Imdb === imdbId) ||
+      (tmdbStr && ids.Tmdb?.toString() === tmdbStr)
+    );
+  });
+
+  if (found) {
+    const matchedBy = found.ProviderIds?.Imdb === imdbId ? "IMDB" : "TMDB";
+    logInfo(`Matched "${found.Name}" by ${matchedBy} ID.`);
+    return found;
+  }
+
+  logWarn(
+    `Searched ${result.Items.length} candidates for "${itemName}", ` +
+    `but none matched IMDB:${imdbId} or TMDB:${tmdbId}.`
+  );
+  return null;
 }
+
 
   /**
    * Get seasons for a given series item.
