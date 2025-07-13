@@ -91,11 +91,13 @@ interface RequestLinkOpts {
 }
 function buildRequestLink(
   { tmdbId, imdbId, type, season, episode }: RequestLinkOpts,
-): string {
+): string | null {
   const url = new URL(`${ADDON_SERVER}/jellyseerr/request`);
   // prefer tmdbId, else fallback to imdbId param
   if (tmdbId) url.searchParams.set("tmdbid", tmdbId.toString());
-  else url.searchParams.set("imdbid", imdbId);
+  if (!tmdbId && imdbId){
+    return null;
+  }
 
   url.searchParams.set("type", type);
   if (season) url.searchParams.set("season", season);
@@ -215,7 +217,7 @@ builder.defineStreamHandler(
           type,
           season: seasonStr,
           episode: episodeStr,
-        }),
+        }) || undefined,
         name: `Request on Jellyseerr`,
         description: `Click to queue ${id} in Jellyseerr`,
       });
