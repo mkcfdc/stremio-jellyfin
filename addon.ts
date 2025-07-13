@@ -3,6 +3,7 @@ import {
   type Args,
   type ContentType,
   type Stream,
+  type MetaPreview,
 } from "stremio-addon-sdk";
 import { cleanupSession, JellyfinApi, type JellyfinItem } from "./jellyfin.ts";
 import { manifest } from "./manifest.ts";
@@ -72,7 +73,8 @@ builder.defineCatalogHandler(async (args: Args) => {
       items.map((i) => ({ id: i.Id, name: i.Name })),
     );
 
-    const metas = items.map(itemToMeta);
+    const metaPromises = items.map(itemToMeta);
+    const metas: MetaPreview[] = await Promise.all(metaPromises)
     logDebug("Converted items to MetaPreviews. Returning.");
     return { metas };
   } catch (error) {
