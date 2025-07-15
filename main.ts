@@ -7,4 +7,4 @@ logInfo(
 );
 logInfo(`JellyfinSeerr is: ${Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY") && Deno.env.get("ADDON_SERVER") ? "ACTIVE" : "NOT ACTIVE"}`)
 
-Deno.serve({ port: PORT }, handleRequest);
+Deno.serve({ hostname: '0.0.0.0', port: PORT }, handleRequest);

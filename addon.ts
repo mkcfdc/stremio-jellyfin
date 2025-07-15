@@ -2,8 +2,8 @@ import {
   addonBuilder,
   type Args,
   type ContentType,
-  type Stream,
   type MetaPreview,
+  type Stream,
 } from "stremio-addon-sdk";
 import { cleanupSession, JellyfinApi, type JellyfinItem } from "./jellyfin.ts";
 import { manifest } from "./manifest.ts";
@@ -12,9 +12,12 @@ import { logDebug, logError, logInfo, logWarn } from "./utils/logging.ts";
 import { stringToUuid } from "./utils/stringToUuid.ts";
 import { itemToMeta } from "./utils/itemToMeta.ts";
 import { getTmdbFromImdbId } from "./tmdb.ts";
+import { currentRequests } from "./jellyseerr.ts";
 
+const DEV_MODE = Deno.env.get("DENO_ENV") !== "production";
 const ADDON_SERVER = Deno.env.get("ADDON_SERVER")!;
 const JELLYFIN_SERVER = Deno.env.get("JELLYFIN_SERVER")!;
+
 
 export const jellyfin = new JellyfinApi();
 try {
@@ -74,7 +77,7 @@ builder.defineCatalogHandler(async (args: Args) => {
     );
 
     const metaPromises = items.map(itemToMeta);
-    const metas: MetaPreview[] = await Promise.all(metaPromises)
+    const metas: MetaPreview[] = await Promise.all(metaPromises);
     logDebug("Converted items to MetaPreviews. Returning.");
     return { metas };
   } catch (error) {
@@ -97,7 +100,7 @@ function buildRequestLink(
   const url = new URL(`${ADDON_SERVER}/jellyseerr/request`);
   // prefer tmdbId, else fallback to imdbId param
   if (tmdbId) url.searchParams.set("tmdbid", tmdbId.toString());
-  if (!tmdbId && imdbId){
+  if (!tmdbId && imdbId) {
     return null;
   }
 
@@ -107,20 +110,73 @@ function buildRequestLink(
   return url.toString();
 }
 
-// DRY stream response builder
-function makeStreamResponse(opts: {
+interface StreamOpts {
   url?: string;
   externalUrl?: string;
+  tmdbId?: number;
   name: string;
   description: string;
-}) {
-  const stream: any = { name: opts.name, description: opts.description };
-  if (opts.url) stream.url = opts.url;
-  else if (opts.externalUrl) stream.externalUrl = opts.externalUrl;
+}
+
+export async function makeStreamResponse(opts: StreamOpts) {
+  const { tmdbId, name, description, url, externalUrl } = opts;
+  let title = name;
+  let globalDescription = description;
+  let globalExternalUrl = externalUrl;
+
+  console.log(tmdbId);
+
+  if (tmdbId) {
+    console.log("WE ARE IN tmdbId: " + tmdbId);
+    const list = await currentRequests();
+    console.log("list: " + JSON.stringify(list));
+    if (Array.isArray(list)) {
+      const found = list.find((r) => r.media.tmdb === Number(tmdbId));
+      console.log("found: " + JSON.stringify(found));
+      if (found) {
+        console.log("INSIDE OF FOUND!");
+        const detail = await currentRequests(found.id);
+        console.log("💡 detail JSON:", detail);
+
+        if (!Array.isArray(detail) && "media" in detail) {
+          const {
+            estimatedCompletionTime: eta,
+            status: _rawStatus,
+            timeLeft: left,
+            size,
+            mediaType,
+            sizeLeft
+          } = detail.media;
+
+          const percent = Number(size) > 0
+  ? ((Number(size) - Number(sizeLeft)) / Number(size)) * 100
+  : 0;
+
+          // build the suffix
+          let suffix = "\nRequested ✅";
+          if (left !== undefined) {
+            suffix += `\nTime Left: ${left}\nETA: ${eta ?? "n/a"}\nPercent Downloaded: ${percent}%`;
+          } else {
+            suffix += `\nCurrently being transcoded.`;
+          }
+
+          title = 'Requested for Download';
+          globalDescription = suffix;
+          globalExternalUrl = `${ADDON_SERVER}/jellyseerr/request?tmdbid=${tmdbId}&type=${mediaType}`;
+
+        }
+      }
+    }
+  }
+
+  const stream: Record<string, any> = { name: title, description: globalDescription };
+  if (url) stream.url = url;
+  else if (externalUrl) stream.externalUrl = globalExternalUrl;
+
   return { streams: [stream] };
 }
 
-// Simple in-memory cache for TMDB lookups
+// @TODO: Simple in-memory cache for TMDB lookups THIS SHOULD BE REDIS.
 const tmdbCache = new Map<string, { tmdb_id: number; tmdb_title: string }>();
 async function getTmdbCached(imdbId: string, type: ContentType) {
   if (!tmdbCache.has(imdbId)) {
@@ -201,6 +257,7 @@ builder.defineStreamHandler(
         const uuid = stringToUuid(item.Id);
         const sourceId = item.MediaSources[0].Id;
         const token = jellyfin.getAccessToken();
+        // @TODO: should proxy this address since it includes the api_key!
         const url = `${JELLYFIN_SERVER}/videos/${uuid}/stream.mkv?static=true` +
           `&api_key=${token}` +
           `&mediaSourceId=${sourceId}`;
@@ -220,6 +277,7 @@ builder.defineStreamHandler(
           season: seasonStr,
           episode: episodeStr,
         }) || undefined,
+        tmdbId,
         name: `Request on Jellyseerr`,
         description: `Click to queue ${id} in Jellyseerr`,
       });

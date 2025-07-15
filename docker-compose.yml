@@ -1,6 +1,6 @@
 services:
   stremio-jellyfin:
-    image: ghcr.io/mkcfdc/stremio-jellyfin
+    image: ghcr.io/mkcfdc/stremio-jellyfin:latest
     container_name: stremio-jellyfin
     ports:
       - '60421:60421'

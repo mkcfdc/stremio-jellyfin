@@ -1,24 +1,32 @@
-# Use the official Deno runtime image
+# === 1. Build React App ===
+FROM denoland/deno:2.4.1 AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+COPY frontend/deno*.json ./
+RUN deno install
+COPY frontend .
+RUN deno run -A npm:vite build
+
+# === 2. Build Deno App ===
 FROM denoland/deno:alpine-2.4.1
 
-# Set up workdir and copy in your code
-WORKDIR /home/deno/app
+# App directory
+WORKDIR /app
 COPY . .
 
-# Environment variables
-ENV JELLYFIN_USERNAME="changeme"
-ENV JELLYFIN_PW="changeme"
-ENV JELLYFIN_SERVER="http://localhost"
-ENV PORT=60421
-ENV DENO_ENV="production"
+# Copy frontend build output into Deno's static folder
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
+# Set environment variables
+ENV PORT=60421
+EXPOSE 60421
+
+# Cache dependencies
 RUN deno cache main.ts
 
-# Switch to non-root user
+# Run as non-root
 USER deno
 
-# Expose the port your app listens on
-EXPOSE $PORT
-
-# Run your server with the minimal required permissions
+# Run Deno server
 ENTRYPOINT ["deno", "run", "--allow-net", "--allow-env", "--allow-sys", "--allow-read", "main.ts"]

@@ -1,8 +1,24 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-env --allow-read --allow-sys --env-file --allow-net main.ts"
+    "dev": "DENO_ENV=development deno run --watch --allow-env --allow-read --allow-sys --env-file --allow-net main.ts"
   },
   "imports": {
+    "@std/http": "jsr:@std/http@^1.0.19",
+    "@std/path": "jsr:@std/path@^1.1.1",
     "stremio-addon-sdk": "npm:stremio-addon-sdk@^1.6.10"
+  },
+  "compilerOptions": {
+    "types": [
+      "react",
+      "react-dom",
+      "@types/react"
+    ],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
   }
 }
