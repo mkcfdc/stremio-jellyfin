@@ -3,7 +3,7 @@
 import { fromFileUrl, join } from "@std/path";
 import { serveDir } from "@std/http/file-server";
 
-import { addonInterface } from "./addon.ts";
+import { addonInterface, jellyfin } from "./addon.ts";
 import {
   buildTmdbRequest,
   currentRequests,
@@ -12,9 +12,12 @@ import {
 } from "./jellyseerr.ts";
 import { fetchTmdbData } from "./tmdb.ts";
 import { type JellyfinItem } from "./jellyfin.ts";
+import { logDebug } from "./utils/logging.ts";
 
 const frontendPath = fromFileUrl(new URL("./frontend/dist", import.meta.url));
 const DEV_MODE = Deno.env.get("DENO_ENV") !== "production";
+const JELLYFIN_SERVER = Deno.env.get("JELLYFIN_SERVER");
+const API_KEY = jellyfin.getAccessToken();
 
 export function withCors(res: Response): Response {
   const headers = new Headers(res.headers);
@@ -254,7 +257,8 @@ export async function handleRequest(req: Request): Promise<Response> {
     return withCors(new Response(null, { status: 204 }));
   }
 
-  const path = new URL(req.url).pathname;
+  const url = new URL(req.url);
+  const path = url.pathname;
 
   if (
     Deno.env.get("JELLYSEERR_SERVER") && Deno.env.get("JELLYSEERR_API_KEY") &&
@@ -268,6 +272,34 @@ export async function handleRequest(req: Request): Promise<Response> {
       const id = Number(detailMatch[1]);
       return await handleJellyseerrTmdbRequest(req, id);
     }
+  }
+
+  if (url.pathname === "/jf/stream" && req.method === "GET") {
+    // this increases bandwidth usage but, it also keeps your access token safe... so the security trade off is worth it.
+    const uuid          = url.searchParams.get("uuid");
+    const mediaSourceId = url.searchParams.get("mediaSourceId");
+    if (!uuid || !mediaSourceId) {
+      return new Response("Missing parameters", { status: 400 });
+    }
+
+    const rangeHeader = req.headers.get("range") ?? undefined; 
+    const fetchHeaders: Record<string, string> = {};
+    if (rangeHeader) fetchHeaders["range"] = rangeHeader;
+
+    const jellyfinUrl = `${JELLYFIN_SERVER}/videos/${uuid}/stream.mkv` +
+                        `?static=true&api_key=${API_KEY}` +
+                        `&mediaSourceId=${mediaSourceId}`;
+    const upstreamRes = await fetch(jellyfinUrl, { headers: fetchHeaders });
+
+    const headers = new Headers(upstreamRes.headers);             
+    headers.set("Accept-Ranges", "bytes");                       
+    headers.set("Access-Control-Allow-Origin", "*");    
+
+    logDebug(`Streaming ${uuid} from Jellyfin. (Proxied)`);
+    return new Response(upstreamRes.body, {
+      status: upstreamRes.status,
+      headers,
+    });
   }
   if (path === "/manifest.json" && req.method === "GET") {
     return handleManifest(req);

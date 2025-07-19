@@ -16,7 +16,6 @@ import { currentRequests } from "./jellyseerr.ts";
 
 const DEV_MODE = Deno.env.get("DENO_ENV") !== "production";
 const ADDON_SERVER = Deno.env.get("ADDON_SERVER")!;
-const JELLYFIN_SERVER = Deno.env.get("JELLYFIN_SERVER")!;
 
 
 export const jellyfin = new JellyfinApi();
@@ -256,11 +255,7 @@ builder.defineStreamHandler(
       if (item?.MediaSources?.length) {
         const uuid = stringToUuid(item.Id);
         const sourceId = item.MediaSources[0].Id;
-        const token = jellyfin.getAccessToken();
-        // @TODO: should proxy this address since it includes the api_key!
-        const url = `${JELLYFIN_SERVER}/videos/${uuid}/stream.mkv?static=true` +
-          `&api_key=${token}` +
-          `&mediaSourceId=${sourceId}`;
+        const url = `${ADDON_SERVER}/jf/stream?uuid=${uuid}&mediaSourceId=${sourceId}`;
         return makeStreamResponse({
           url,
           name: item.Name,

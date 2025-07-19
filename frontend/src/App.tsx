@@ -36,7 +36,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/request/:tmdbId" element={<RequestPage />} />
-          <Route path="*" element={<div>Not found</div>} />
+          <Route path="*" element={<div>Not found.</div>} />
         </Routes>
       </BrowserRouter>
       <ReactQueryDevtools initialIsOpen={false} />

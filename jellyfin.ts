@@ -144,7 +144,7 @@ export class JellyfinApi {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Emby-Authorization": this.authHeaderValueWithoutToken(),
+          Authorization: this.authHeaderValueWithoutToken(),
         },
         body: JSON.stringify(authBody),
       });
@@ -240,7 +240,7 @@ export class JellyfinApi {
   }
 
   /**
-   * Constructs the X-Emby-Authorization header value.
+   * Constructs the Authorization header value.
    * Jellyfin's auth header format:
    * MediaBrowser Client="YourClient", Device="YourDevice", DeviceId="YourDeviceId", Version="YourVersion", Token="YourToken"
    */
@@ -249,7 +249,7 @@ export class JellyfinApi {
   }
 
   /**
-   * Constructs the X-Emby-Authorization header value without a token,
+   * Constructs the Authorization header value without a token,
    * used for the initial authentication request.
    */
   private authHeaderValueWithoutToken(): string {
@@ -276,7 +276,7 @@ export class JellyfinApi {
 
     const headers: HeadersInit = {
       "Content-Type": "application/json",
-      "X-Emby-Authorization": this.authHeaderValueWithToken(),
+      Authorization: this.authHeaderValueWithToken(),
     };
 
     logDebug(`JellyfinApi: Sending ${method} request to: ${url.toString()}`);
