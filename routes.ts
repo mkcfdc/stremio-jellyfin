@@ -153,7 +153,7 @@ export async function handleJellyseerrRequest(req: Request): Promise<Response> {
     const list = await currentRequests(); // -> SimpleRequest[]
     if (Array.isArray(list)) {
       const existing = list.find((r) => r.media.tmdb === tmdbId);
-      const frontend = DEV_MODE ? `` : `http://localhost:5173`;
+      const frontend = DEV_MODE ? `http://localhost:5173` : ``;
       if (existing) {
         return withCors(
           new Response(null, {
@@ -190,7 +190,7 @@ export async function handleJellyseerrRequest(req: Request): Promise<Response> {
 
     const payload = buildTmdbRequest(opts);
     const _result = await requestByTmdb(payload);
-    const frontend = DEV_MODE ? `` : `http://localhost:5173`;
+    const frontend = DEV_MODE ? `http://localhost:5173` : ``;
 
     return withCors(
       new Response(null, {
@@ -276,6 +276,8 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   if (url.pathname === "/jf/stream" && req.method === "GET") {
     // this increases bandwidth usage but, it also keeps your access token safe... so the security trade off is worth it.
+    // doing it this way also removes the need for a public facing Jellyfin instance! Huge bonus!!
+    // You could run your AARS stack behind Tailscale.
     const uuid          = url.searchParams.get("uuid");
     const mediaSourceId = url.searchParams.get("mediaSourceId");
     if (!uuid || !mediaSourceId) {
