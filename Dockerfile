@@ -20,6 +20,8 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Set environment variables
 ENV PORT=60421
+ENV DENO_ENV=production
+
 EXPOSE 60421
 
 # Cache dependencies
