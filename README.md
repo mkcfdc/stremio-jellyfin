@@ -33,4 +33,12 @@ Finally, add the manifest to Stremio to install this addon:
 
 `http://<your docker host>:60421/manifest.json`
 
-Next I plan to add JellySeerr integration, add content direct from Stremio!
+
+### What's different in this version:
+1. Uses Deno Typescript
+2. No need for the Stremio Companion Plugin in Jellyfin.
+3. Provides proxying to the Jellyfin server. Now you do not even need to provide public access to your Jellyfin server. Keeping your API keys and password secure. Run Jellyfin behind Tailscale and run this addon publicly. I recommend creating a 'stremio' user on Jellyfin.
+4. Jellyseer can now be used to request content directly from Stremio, with web interface for visual tracking.
+
+### Things that need some work:
+1. Series does not quite work properly. Need to spend more time here.
