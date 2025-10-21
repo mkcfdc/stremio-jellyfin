@@ -1,5 +1,5 @@
 # === 1. Build React App ===
-FROM denoland/deno:2.4.1 AS frontend-builder
+FROM denoland/deno:alpine-2.4.1 AS frontend-builder
 
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -31,4 +31,5 @@ RUN deno cache main.ts
 USER deno
 
 # Run Deno server
+
 ENTRYPOINT ["deno", "run", "--allow-net", "--allow-env", "--allow-sys", "--allow-read", "main.ts"]
